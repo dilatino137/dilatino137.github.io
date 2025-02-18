@@ -181,11 +181,16 @@
             "pole-arm": [5.2, 3.5]
         };
         const percentageEffects = [
-            // [STR, attack], STR = [10%, 60%, 100%], 10% = [ATT, ACC]
+            // [STR, DEX, attack], STR = [10%, 60%, 100%], 10% = [ATT, ACC]
             [
                 [3.0, 9.25],
                 [1.0, 5.75],
                 [0.0, 1.25]
+            ],
+            [
+                [0.0, -6.25],
+                [0.0, -3.75],
+                [0.0, -1.25]
             ],
             [
                 [5.0, 3.0],
@@ -325,7 +330,7 @@
         }
 
         function calculateDamageForCombination(combination, str, dex, att, mastery, weaponType) {
-            // percentageEffects(2*3*2) = [STR, attack], STR = [10%, 60%, 100%], 10% = [ATT, ACC]
+            // percentageEffects(2*3*2) = [STR, DEX, attack], STR = [10%, 60%, 100%], 10% = [ATT, ACC]
             // combination(3*2)
             function inner2d(arr1, arr2) { // Both arrays have identical shapes
                 let result = 0.0;
@@ -335,11 +340,11 @@
                 }
                 return result;
             }
-            let [extraStr, extraAtt] = percentageEffects.map(effect => inner2d(effect, combination));
+            let [extraStr, extraDex, extraAtt] = percentageEffects.map(effect => inner2d(effect, combination));
             let [large_k, small_k] = weaponCoefficients[weaponType];
 
-            const largeDamage = ((str + extraStr) * large_k + dex) * (att + extraAtt) / 100;
-            const smallDamage = ((str + extraStr) * small_k * mastery / 100 * 0.9 + dex) * (att + extraAtt) / 100;
+            const largeDamage = ((str + extraStr) * large_k + dex + extraDex) * (att + extraAtt) / 100;
+            const smallDamage = ((str + extraStr) * small_k * mastery / 100 * 0.9 + dex + extraDex) * (att + extraAtt) / 100;
             const meanDamage = (largeDamage + smallDamage) / 2;
 
             return { largeDamage, smallDamage, meanDamage };
