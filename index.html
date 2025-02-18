@@ -170,13 +170,36 @@
     </div>
 
     <script>
-        let previousSelections = []; // Store previous selections
+        const weaponCoefficients = {
+            "one-handed sword": [4.2, 4.2],
+            "two-handed sword": [4.8, 4.8],
+            "one-handed axe": [4.8, 3.6],
+            "two-handed axe": [5.2, 4.0],
+            "one-handed bw": [4.8, 3.6],
+            "two-handed bw": [5.2, 4.0],
+            "spear": [5.1, 3.6],
+            "pole-arm": [5.2, 3.5]
+        };
+        const percentageEffects = [
+            // [STR, attack], STR = [10%, 60%, 100%], 10% = [ATT, ACC]
+            [
+                [3.0, 9.25],
+                [1.0, 5.75],
+                [0.0, 1.25]
+            ],
+            [
+                [5.0, 3.0],
+                [2.0, 1.0],
+                [1.0, 0.0]
+            ]
+        ];
+
+        let previousSelections = [];
 
         function createTable() {
             const scrollsValue = document.getElementById('scrolls').value;
             const newTableContainer = document.getElementById('newTable');
             
-            // Clear any previous table
             newTableContainer.innerHTML = '';
 
             if (scrollsValue) {
@@ -245,11 +268,10 @@
             document.getElementById('att').value = '';
             document.getElementById('mastery').value = '';
             document.getElementById('scrolls').value = '';
-            document.getElementById('weaponType').value = ''; // Reset weapon type to empty
+            document.getElementById('weaponType').value = '';
             const selects = document.querySelectorAll('#newTable select');
             selects.forEach(select => select.value = "");
 
-            // Clear the previousSelections array
             previousSelections = [];
 
             // Disable the calculate button after clearing inputs
@@ -275,44 +297,52 @@
             }
         }
 
-        function generateCombinations(options, numSelections) {
-            // Create a recursive function to generate all combinations
-            function combine(arr, start, currentCombination) {
-                if (currentCombination.length === numSelections) {
-                    combinations.push(currentCombination.slice()); // Add the complete combination
-                    return;
+        function generateCombinations(options) {
+            // Count the occurrences of each percentage (e.g., "10", "60", "100")
+            let nums = ["10", "60", "100"].map(percentage => options.filter(item => item === percentage).length);
+
+            function generateCombinationForOnePercentage(num) {
+                const result = [];
+                for (let i = 0; i <= num; ++i) {
+                    result.push([i, num - i]);
                 }
-                
-                for (let i = start; i < arr.length; i++) {
-                    currentCombination.push(arr[i]);
-                    combine(arr, i + 1, currentCombination); // Recurse with the next index
-                    currentCombination.pop(); // Remove last element to try the next
+                return result;
+            }
+
+            const combinationsForEach = nums.map(num => generateCombinationForOnePercentage(num));
+
+            const combinations = [];
+
+            for (let i = 0; i < combinationsForEach[0].length; i++) {
+                for (let j = 0; j < combinationsForEach[1].length; j++) {
+                    for (let k = 0; k < combinationsForEach[2].length; k++) {
+                        combinations.push([combinationsForEach[0][i], combinationsForEach[1][j], combinationsForEach[2][k]])
+                    }
                 }
             }
 
-            const combinations = [];
-            combine(options, 0, []);
             return combinations;
         }
 
         function calculateDamageForCombination(combination, str, dex, att, mastery, weaponType) {
-            // Simplified formula for damage calculation. Replace with your actual calculation logic.
-            let baseDamage = att + str + dex + mastery;
-            let damageMultiplier = 1;
-
-            // Apply modifiers from the combination (e.g., 10% ATT, 60% ACC)
-            combination.forEach(modifier => {
-                if (modifier.includes("ATT")) {
-                    const percent = parseInt(modifier) / 100;
-                    damageMultiplier += percent;
+            // percentageEffects(2*3*2) = [STR, attack], STR = [10%, 60%, 100%], 10% = [ATT, ACC]
+            // combination(3*2)
+            function inner2d(arr1, arr2) { // Both arrays have identical shapes
+                let result = 0.0;
+                for (let i = 0; i < arr1.length; i++) {
+                    for (let j = 0; j < arr1[i].length; j++)
+                    result += arr1[i][j] * arr2[i][j];
                 }
-            });
+                return result;
+            }
+            let [extraStr, extraAtt] = percentageEffects.map(effect => inner2d(effect, combination));
+            let [large_k, small_k] = weaponCoefficients[weaponType];
 
-            const totalLargeDamage = baseDamage * damageMultiplier; // Large damage (example)
-            const totalSmallDamage = totalLargeDamage * 0.8; // Small damage (example)
-            const meanDamage = (totalLargeDamage + totalSmallDamage) / 2; // Average damage
+            const largeDamage = ((str + extraStr) * large_k + dex) * (att + extraAtt) / 100;
+            const smallDamage = ((str + extraStr) * small_k * mastery / 100 * 0.9 + dex) * (att + extraAtt) / 100;
+            const meanDamage = (largeDamage + smallDamage) / 2;
 
-            return { totalLargeDamage, totalSmallDamage, meanDamage };
+            return { largeDamage, smallDamage, meanDamage };
         }
 
         function performCalculation() {
@@ -322,13 +352,12 @@
             const att = parseFloat(document.getElementById('att').value);
             const mastery = parseFloat(document.getElementById('mastery').value);
             const weaponType = document.getElementById('weaponType').value;
-            const scrollsValue = document.getElementById('scrolls').value;
             const scrollOptions = document.querySelectorAll('#newTable select');
 
             const combinationOptions = Array.from(scrollOptions).map(select => select.value);
             
             // Generate all possible combinations based on selected scrolls
-            const allCombinations = generateCombinations(combinationOptions, scrollsValue);
+            const allCombinations = generateCombinations(combinationOptions);
 
             let bestLargeDamage = 0;
             let bestSmallDamage = 0;
@@ -339,17 +368,16 @@
 
             // Evaluate all combinations
             allCombinations.forEach(combination => {
-                const { totalLargeDamage, totalSmallDamage, meanDamage } = calculateDamageForCombination(
+                const { largeDamage, smallDamage, meanDamage } = calculateDamageForCombination(
                     combination, str, dex, att, mastery, weaponType
                 );
-
-                if (totalLargeDamage > bestLargeDamage) {
-                    bestLargeDamage = totalLargeDamage;
+                if (largeDamage > bestLargeDamage) {
+                    bestLargeDamage = largeDamage;
                     bestLargeCombination = combination;
                 }
 
-                if (totalSmallDamage > bestSmallDamage) {
-                    bestSmallDamage = totalSmallDamage;
+                if (smallDamage > bestSmallDamage) {
+                    bestSmallDamage = smallDamage;
                     bestSmallCombination = combination;
                 }
 
@@ -359,17 +387,48 @@
                 }
             });
 
+            // Re-calculate attack for best combinations
+            let [bestLargeResult, bestSmallResult, bestMeanResult] = [bestLargeCombination, bestSmallCombination, bestMeanCombination].map(combination => calculateDamageForCombination(combination, str, dex, att, mastery, weaponType));
+
             // Display results
+            function formatCombination(combination) {
+                const labels = {
+                    "10": ["10%攻擊", "10%命中"],  // 10% scrolls for ATT and ACC
+                    "60": ["60%攻擊", "60%命中"],  // 60% scrolls for ATT and ACC
+                    "100": ["100%攻擊", "100%命中"] // 100% scrolls for ATT and ACC
+                };
+
+                let formattedCombination = [];
+
+                // Iterate through each scroll percentage (10%, 60%, 100%)
+                [10, 60, 100].forEach((percentage, index) => {
+                    const [countAtt, countAcc] = combination[index];
+
+                    // Process ATT scrolls if count is greater than 0
+                    if (countAtt > 0) {
+                        formattedCombination.push(`${countAtt} x ${labels[percentage][0]}`);
+                    }
+
+                    // Process ACC scrolls if count is greater than 0
+                    if (countAcc > 0) {
+                        formattedCombination.push(`${countAcc} x ${labels[percentage][1]}`);
+                    }
+                });
+
+                // Join the formatted combination into a string and return
+                return formattedCombination.join(', ');
+            }
+            
             document.getElementById('resultContainer').innerHTML = `
                 <h3>計算結果:</h3>
-                <p><span class="damage-large">最大大傷害: ${bestLargeDamage.toFixed(2)}</span></p>
-                <p>最佳組合: ${bestLargeCombination.join(', ')}</p>
+                <p><span class="damage-large">最高大傷組合：${formatCombination(bestLargeCombination)}</span></p>
+                <p>表攻: ${Math.floor(bestLargeResult["smallDamage"])}~${Math.floor(bestLargeResult["largeDamage"])}</p>
                 <hr>
-                <p><span class="damage-small">最大小傷害: ${bestSmallDamage.toFixed(2)}</span></p>
-                <p>最佳組合: ${bestSmallCombination.join(', ')}</p>
+                <p><span class="damage-small">最高小傷組合：${formatCombination(bestSmallCombination)}</span></p>
+                <p>表攻: ${Math.floor(bestSmallResult["smallDamage"])}~${Math.floor(bestSmallResult["largeDamage"])}</p>
                 <hr>
-                <p><span class="damage-mean">最大平均傷害: ${bestMeanDamage.toFixed(2)}</span></p>
-                <p>最佳組合: ${bestMeanCombination.join(', ')}</p>
+                <p><span class="damage-mean">最高均傷組合：${formatCombination(bestMeanCombination)}</span></p>
+                <p>表攻: ${Math.floor(bestMeanResult["smallDamage"])}~${Math.floor(bestMeanResult["largeDamage"])}</p>
             `;
         }
     </script>
