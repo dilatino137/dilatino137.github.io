@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -28,7 +28,10 @@
             text-align: center;
             border: 1px solid #ccc;
         }
-        input {
+        th {
+            width: 20%; /* Ensure equal width for the header columns */
+        }
+        td input, td select {
             width: 80%;
         }
         button {
@@ -36,20 +39,149 @@
             width: 80%;
             margin-top: 10px;
         }
+        h3 {
+            text-align: left;  /* Aligns the text to the left */
+            font-size: 24px;   /* Sets the font size to make it stand out */
+            margin: 0 0 15px 0; /* Adds space below the heading */
+            font-weight: bold;  /* Makes the text bold */
+            color: #333;        /* Sets a dark color for good contrast */
+        }
+        h4 {
+            text-align: left;
+            font-size: 18px;
+            font-weight: normal;
+            color: #555;
+            margin-top: 20px;
+        }
+        ul {
+            text-align: left;
+            margin-left: 30px;
+            color: #555;
+        }
+
+        /* Remove the up and down buttons for input[type="number"] */
+        input[type="number"]::-webkit-outer-spin-button,
+        input[type="number"]::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        input[type="number"] {
+            -moz-appearance: textfield;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h2>Calculator</h2>
+        <h2>Artale劍士衝卷計算機</h2>
+        <h3>衝裝前數值：</h3>
         <table>
             <tr>
-                <th>STR</th>
-                <th>ATT</th>
-                <th>Mastery</th>
+                <th>力量</th>
+                <th>敏捷</th>
+                <th>攻擊</th>
+                <th>熟練度(%)</th>
+                <th>卷軸數</th>
             </tr>
             <tr>
-                <td><input type="number" id="str" placeholder="Enter STR"></td>
-                <td><input type="number" id="att" placeholder="Enter ATT"></td>
-                <td><input type="number" id="mastery" placeholder="Enter Mastery"></td>
+                <td><input type="number" id="str" placeholder="角色力量"></td>
+                <td><input type="number" id="dex" placeholder="角色敏捷"></td>
+                <td><input type="number" id="att" placeholder="衝卷前攻擊"></td>
+                <td><input type="number" id="mastery" placeholder="武器熟練度"></td>
+                <td>
+                    <select id="scrolls" onchange="createTable()">
+                        <option value="">--選擇卷軸數--</option>
+                        <option value="1">1</option>
+                        <option value="2">2</option>
+                        <option value="3">3</option>
+                        <option value="4">4</option>
+                        <option value="5">5</option>
+                        <option value="6">6</option>
+                        <option value="7">7</option>
+                        <option value="8">8</option>
+                        <option value="9">9</option>
+                        <option value="10">10</option>
+                    </select>
+                </td>
             </tr>
         </table>
+        <h4>說明:</h4>
+        <ul>
+            <li><strong>力量與敏捷</strong>為含裝備(衝卷前)屬性。</li>
+            <li><strong>攻擊</strong>為全身裝備、藥丸、技能buff、天氣等之總和。</li>
+            <li><strong>參考熟練度</strong>： 
+                <ul>
+                    <li>無技能: 10%</li>
+                    <li>精通點滿: 60%</li>
+                    <li>精通+槍連擊/矛無雙: 95%</li>
+                    <li>精通+槍連擊/矛無雙+暗之靈魂: 115%</li>
+                </ul>
+            </li>
+        </ul>
+
+        <!-- Placeholder for dynamically generated table -->
+        <div id="newTable"></div>
+    </div>
+
+    <script>
+        function createTable() {
+            const scrollsValue = document.getElementById('scrolls').value;
+            const newTableContainer = document.getElementById('newTable');
+            
+            // Clear any previous table
+            newTableContainer.innerHTML = '';
+
+            if (scrollsValue) {
+                const columns = parseInt(scrollsValue);
+                const table = document.createElement('table');
+                const headerRow = document.createElement('tr');
+                
+                // Create table headers based on the number of scrolls
+                for (let i = 0; i < columns; i++) {
+                    const th = document.createElement('th');
+                    th.textContent = `卷軸 ${i + 1}`;
+                    headerRow.appendChild(th);
+                }
+
+                table.appendChild(headerRow);
+
+                // Add a row with dropdown selections for each column
+                const inputRow = document.createElement('tr');
+                for (let i = 0; i < columns; i++) {
+                    const td = document.createElement('td');
+                    const select = document.createElement('select');
+                    
+                    // Add empty option first
+                    const emptyOption = document.createElement('option');
+                    emptyOption.value = "";
+                    emptyOption.textContent = "--選擇百分比--";
+                    select.appendChild(emptyOption);
+
+                    // Add the percentage options
+                    const option1 = document.createElement('option');
+                    option1.value = '10';
+                    option1.textContent = '10%';
+                    const option2 = document.createElement('option');
+                    option2.value = '60';
+                    option2.textContent = '60%';
+                    const option3 = document.createElement('option');
+                    option3.value = '100';
+                    option3.textContent = '100%';
+                    
+                    select.appendChild(option1);
+                    select.appendChild(option2);
+                    select.appendChild(option3);
+                    td.appendChild(select);
+                    inputRow.appendChild(td);
+                }
+
+                table.appendChild(inputRow);
+
+                // Add styles to handle larger tables better (columns > 5)
+                table.style.tableLayout = 'fixed';
+                table.style.width = '100%';
+                newTableContainer.appendChild(table);
+            }
+        }
+    </script>
+</body>
+</html>
