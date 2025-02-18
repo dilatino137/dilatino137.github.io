@@ -22,6 +22,7 @@
             width: 100%;
             margin: 20px 0;
             border-collapse: collapse;
+            table-layout: fixed;
         }
         th, td {
             padding: 10px;
@@ -29,7 +30,7 @@
             border: 1px solid #ccc;
         }
         th {
-            width: 20%; /* Ensure equal width for the header columns */
+            width: 16%;
         }
         td input, td select {
             width: 80%;
@@ -40,11 +41,11 @@
             margin-top: 10px;
         }
         h3 {
-            text-align: left;  /* Aligns the text to the left */
-            font-size: 24px;   /* Sets the font size to make it stand out */
-            margin: 0 0 15px 0; /* Adds space below the heading */
-            font-weight: bold;  /* Makes the text bold */
-            color: #333;        /* Sets a dark color for good contrast */
+            text-align: left;
+            font-size: 24px;
+            margin: 0 0 15px 0;
+            font-weight: bold;
+            color: #333;
         }
         h4 {
             text-align: left;
@@ -58,8 +59,6 @@
             margin-left: 30px;
             color: #555;
         }
-
-        /* Remove the up and down buttons for input[type="number"] */
         input[type="number"]::-webkit-outer-spin-button,
         input[type="number"]::-webkit-inner-spin-button {
             -webkit-appearance: none;
@@ -67,6 +66,36 @@
         }
         input[type="number"] {
             -moz-appearance: textfield;
+        }
+        .result-container {
+            background-color: #f9f9f9;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            margin-top: 20px;
+        }
+        .result-container p {
+            font-size: 18px;
+            font-weight: 500;
+            color: #555;
+            margin-bottom: 10px;
+        }
+        .result-container span {
+            font-weight: bold;
+            color: #333;
+        }
+        .result-container .damage-large {
+            color: #e74c3c;
+        }
+        .result-container .damage-small {
+            color: #f39c12;
+        }
+        .result-container .damage-mean {
+            color: #2ecc71;
+        }
+        hr {
+            border: 1px solid #ddd;
+            margin: 10px 0;
         }
     </style>
 </head>
@@ -80,16 +109,30 @@
                 <th>敏捷</th>
                 <th>攻擊</th>
                 <th>熟練度(%)</th>
+                <th>武器種類</th>
                 <th>卷軸數</th>
             </tr>
             <tr>
-                <td><input type="number" id="str" placeholder="角色力量"></td>
-                <td><input type="number" id="dex" placeholder="角色敏捷"></td>
-                <td><input type="number" id="att" placeholder="衝卷前攻擊"></td>
-                <td><input type="number" id="mastery" placeholder="武器熟練度"></td>
+                <td><input type="number" id="str" placeholder="角色力量" oninput="validateInputs()"></td>
+                <td><input type="number" id="dex" placeholder="角色敏捷" oninput="validateInputs()"></td>
+                <td><input type="number" id="att" placeholder="衝卷前攻擊" oninput="validateInputs()"></td>
+                <td><input type="number" id="mastery" placeholder="武器熟練度" oninput="validateInputs()"></td>
                 <td>
-                    <select id="scrolls" onchange="createTable()">
-                        <option value="">--選擇卷軸數--</option>
+                    <select id="weaponType" onchange="validateInputs()">
+                        <option value="">--</option>
+                        <option value="one-handed sword">單手劍</option>
+                        <option value="two-handed sword">雙手劍</option>
+                        <option value="one-handed axe">單手斧</option>
+                        <option value="two-handed axe">雙手斧</option>
+                        <option value="one-handed bw">單手棍</option>
+                        <option value="two-handed bw">雙手棍</option>
+                        <option value="spear">槍</option>
+                        <option value="pole-arm">矛</option>
+                    </select>
+                </td>
+                <td>
+                    <select id="scrolls" onchange="createTable(); validateInputs()">
+                        <option value="">--</option>
                         <option value="1">1</option>
                         <option value="2">2</option>
                         <option value="3">3</option>
@@ -111,18 +154,24 @@
             <li><strong>參考熟練度</strong>： 
                 <ul>
                     <li>無技能: 10%</li>
-                    <li>精通點滿: 60%</li>
+                    <li>精通19/20: 60%</li>
                     <li>精通+槍連擊/矛無雙: 95%</li>
                     <li>精通+槍連擊/矛無雙+暗之靈魂: 115%</li>
                 </ul>
             </li>
         </ul>
 
-        <!-- Placeholder for dynamically generated table -->
         <div id="newTable"></div>
+
+        <button id="clearButton" onclick="clearInputs()">清除所有輸入</button>
+        <button id="calculateButton" onclick="performCalculation()" disabled>進行計算</button>
+
+        <div id="resultContainer" class="result-container"></div>
     </div>
 
     <script>
+        let previousSelections = []; // Store previous selections
+
         function createTable() {
             const scrollsValue = document.getElementById('scrolls').value;
             const newTableContainer = document.getElementById('newTable');
@@ -134,7 +183,7 @@
                 const columns = parseInt(scrollsValue);
                 const table = document.createElement('table');
                 const headerRow = document.createElement('tr');
-                
+
                 // Create table headers based on the number of scrolls
                 for (let i = 0; i < columns; i++) {
                     const th = document.createElement('th');
@@ -149,14 +198,12 @@
                 for (let i = 0; i < columns; i++) {
                     const td = document.createElement('td');
                     const select = document.createElement('select');
-                    
-                    // Add empty option first
+
                     const emptyOption = document.createElement('option');
                     emptyOption.value = "";
-                    emptyOption.textContent = "--選擇百分比--";
+                    emptyOption.textContent = "--";
                     select.appendChild(emptyOption);
 
-                    // Add the percentage options
                     const option1 = document.createElement('option');
                     option1.value = '10';
                     option1.textContent = '10%';
@@ -166,21 +213,164 @@
                     const option3 = document.createElement('option');
                     option3.value = '100';
                     option3.textContent = '100%';
-                    
+
                     select.appendChild(option1);
                     select.appendChild(option2);
                     select.appendChild(option3);
+
+                    // Remember old selections when changing scroll number
+                    if (previousSelections[i]) {
+                        select.value = previousSelections[i];
+                    }
+
+                    select.addEventListener('change', function() {
+                        // Store the selection in previousSelections array
+                        previousSelections[i] = select.value;
+                        validateInputs();  // Re-validate inputs after selection change
+                    });
+
                     td.appendChild(select);
                     inputRow.appendChild(td);
                 }
 
                 table.appendChild(inputRow);
-
-                // Add styles to handle larger tables better (columns > 5)
-                table.style.tableLayout = 'fixed';
                 table.style.width = '100%';
                 newTableContainer.appendChild(table);
             }
+        }
+
+        function clearInputs() {
+            document.getElementById('str').value = '';
+            document.getElementById('dex').value = '';
+            document.getElementById('att').value = '';
+            document.getElementById('mastery').value = '';
+            document.getElementById('scrolls').value = '';
+            document.getElementById('weaponType').value = ''; // Reset weapon type to empty
+            const selects = document.querySelectorAll('#newTable select');
+            selects.forEach(select => select.value = "");
+
+            // Clear the previousSelections array
+            previousSelections = [];
+
+            // Disable the calculate button after clearing inputs
+            document.getElementById('calculateButton').disabled = true;
+        }
+
+        function validateInputs() {
+            const str = document.getElementById('str').value;
+            const dex = document.getElementById('dex').value;
+            const att = document.getElementById('att').value;
+            const mastery = document.getElementById('mastery').value;
+            const weaponType = document.getElementById('weaponType').value;
+            const scrollsValue = document.getElementById('scrolls').value;
+
+            // Ensure all the basic fields are filled before enabling the calculate button
+            if (str && dex && att && mastery && weaponType && scrollsValue) {
+                const selects = document.querySelectorAll('#newTable select');
+                const allFilled = Array.from(selects).every(select => select.value !== "");
+
+                document.getElementById('calculateButton').disabled = !allFilled;
+            } else {
+                document.getElementById('calculateButton').disabled = true;
+            }
+        }
+
+        function generateCombinations(options, numSelections) {
+            // Create a recursive function to generate all combinations
+            function combine(arr, start, currentCombination) {
+                if (currentCombination.length === numSelections) {
+                    combinations.push(currentCombination.slice()); // Add the complete combination
+                    return;
+                }
+                
+                for (let i = start; i < arr.length; i++) {
+                    currentCombination.push(arr[i]);
+                    combine(arr, i + 1, currentCombination); // Recurse with the next index
+                    currentCombination.pop(); // Remove last element to try the next
+                }
+            }
+
+            const combinations = [];
+            combine(options, 0, []);
+            return combinations;
+        }
+
+        function calculateDamageForCombination(combination, str, dex, att, mastery, weaponType) {
+            // Simplified formula for damage calculation. Replace with your actual calculation logic.
+            let baseDamage = att + str + dex + mastery;
+            let damageMultiplier = 1;
+
+            // Apply modifiers from the combination (e.g., 10% ATT, 60% ACC)
+            combination.forEach(modifier => {
+                if (modifier.includes("ATT")) {
+                    const percent = parseInt(modifier) / 100;
+                    damageMultiplier += percent;
+                }
+            });
+
+            const totalLargeDamage = baseDamage * damageMultiplier; // Large damage (example)
+            const totalSmallDamage = totalLargeDamage * 0.8; // Small damage (example)
+            const meanDamage = (totalLargeDamage + totalSmallDamage) / 2; // Average damage
+
+            return { totalLargeDamage, totalSmallDamage, meanDamage };
+        }
+
+        function performCalculation() {
+            // Get the inputs
+            const str = parseFloat(document.getElementById('str').value);
+            const dex = parseFloat(document.getElementById('dex').value);
+            const att = parseFloat(document.getElementById('att').value);
+            const mastery = parseFloat(document.getElementById('mastery').value);
+            const weaponType = document.getElementById('weaponType').value;
+            const scrollsValue = document.getElementById('scrolls').value;
+            const scrollOptions = document.querySelectorAll('#newTable select');
+
+            const combinationOptions = Array.from(scrollOptions).map(select => select.value);
+            
+            // Generate all possible combinations based on selected scrolls
+            const allCombinations = generateCombinations(combinationOptions, scrollsValue);
+
+            let bestLargeDamage = 0;
+            let bestSmallDamage = 0;
+            let bestMeanDamage = 0;
+            let bestLargeCombination = [];
+            let bestSmallCombination = [];
+            let bestMeanCombination = [];
+
+            // Evaluate all combinations
+            allCombinations.forEach(combination => {
+                const { totalLargeDamage, totalSmallDamage, meanDamage } = calculateDamageForCombination(
+                    combination, str, dex, att, mastery, weaponType
+                );
+
+                if (totalLargeDamage > bestLargeDamage) {
+                    bestLargeDamage = totalLargeDamage;
+                    bestLargeCombination = combination;
+                }
+
+                if (totalSmallDamage > bestSmallDamage) {
+                    bestSmallDamage = totalSmallDamage;
+                    bestSmallCombination = combination;
+                }
+
+                if (meanDamage > bestMeanDamage) {
+                    bestMeanDamage = meanDamage;
+                    bestMeanCombination = combination;
+                }
+            });
+
+            // Display results
+            document.getElementById('resultContainer').innerHTML = `
+                <h3>計算結果:</h3>
+                <p><span class="damage-large">最大大傷害: ${bestLargeDamage.toFixed(2)}</span></p>
+                <p>最佳組合: ${bestLargeCombination.join(', ')}</p>
+                <hr>
+                <p><span class="damage-small">最大小傷害: ${bestSmallDamage.toFixed(2)}</span></p>
+                <p>最佳組合: ${bestSmallCombination.join(', ')}</p>
+                <hr>
+                <p><span class="damage-mean">最大平均傷害: ${bestMeanDamage.toFixed(2)}</span></p>
+                <p>最佳組合: ${bestMeanCombination.join(', ')}</p>
+            `;
         }
     </script>
 </body>
